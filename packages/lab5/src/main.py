@@ -1,24 +1,32 @@
 #!/usr/bin/env python3
 
+from cv2 import undistort
+import rospy
 import os
 import numpy as np
 import yaml
 import cv2
 import os
 from tag import Tag
-from pupil_apriltags import Detector
+import math
+from dt_apriltags import Detector
 from duckietown.dtros import DTROS, NodeType
+from sensor_msgs.msg import Range, CompressedImage, Image
+import cv2
+import cv_bridge
 
-
+bridge = cv_bridge.CvBridge()
 class MyNode(DTROS):
 
     def __init__(self, node_name):
         # initialize the DTROS parent class
         super(MyNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
      
-        # TODO: add your subsribers or publishers here
+    
+        self.img_sub = rospy.Subscriber('/csc22905/camera_node/image/compressed', CompressedImage, self.image_callback)
+        self.range_sub = rospy.Subscriber("/csc22905/front_center_tof_driver_node/range", Range, self.range_callback)
+        self.undistorted_pub = rospy.Publisher("/csc22905/lab5/undistorted/compressed", CompressedImage, queue_size=1)
 
-        # TODO: add information about tags
         TAG_SIZE = .08
         FAMILIES = "tagStandard41h12"
         self.tags = Tag(TAG_SIZE, FAMILIES)
@@ -26,15 +34,28 @@ class MyNode(DTROS):
         # Add information about tag locations
         # Function Arguments are id, x, y, z, theta_x, theta_y, theta_z (euler) 
         # for example, self.tags.add_tag( ... 
-
+        self.tags.add_tag(0, 0, 0, 1, 0, 0, 0)
+        self.tags.add_tag(1, 1, 0, 2, 0, (-math.pi)/2, 0)
+        self.tags.add_tag(2, 2, 0, 1, 0, -math.pi, 0)
+        self.tags.add_tag(3, 1, 0, 0, 0, (-3*math.pi)/2, 0)
 
         # Load camera parameters
-        # TODO: change with your robots name
-        with open("/data/config/calibrations/camera_intrinsic/MYROBOT.yaml") as file:
+        with open("/data/config/calibrations/camera_intrinsic/csc22905.yaml") as file:
                 camera_list = yaml.load(file,Loader = yaml.FullLoader)
 
         self.camera_intrinsic_matrix = np.array(camera_list['camera_matrix']['data']).reshape(3,3)
         self.distortion_coeff = np.array(camera_list['distortion_coefficients']['data']).reshape(5,1)
+
+        self.camera = None
+        self.undistorted = None
+
+    def image_callback(self, data: CompressedImage):
+        camera = bridge.compressed_imgmsg_to_cv2(data, "bgr8")
+        self.camera = cv2.cvtColor(camera, cv2.COLOR_BGR2GRAY)
+                # TODO: add your subsribers or publishers here
+    
+    def range_callback(self, data: Range):
+        pass
 
 
     def undistort(self, img):
@@ -86,4 +107,28 @@ class MyNode(DTROS):
             tag_size=TAG_SIZE)
 
         return detected_tags
+
+    def run(self):
+        rate = rospy.Rate(10)
+
+        stop = False
+        while not stop and not rospy.is_shutdown():
+            if self.camera is not None:
+                undistorted = self.undistort(self.camera)
+                msg = bridge.cv2_to_compressed_imgmsg(undistorted)
+                self.undistorted_pub.publish(msg)
+                tags_found = self.detect(undistorted)
+                
+                for tag in tags_found:
+                    print(tag.tag_id)
+                    print(tag.pose_t)
+                    #print(self.tags.estimate_pose(tag.tag_id, tag.pose_R, tag.pose_t))
+                             
+
+            rate.sleep()
+# https://prod.liveshare.vsengsaas.visualstudio.com/join?F71B98363431245A898C6375774D9D1C53A4
+
+if __name__ == "__main__":
+    node = MyNode(node_name="lab5_node")
+    node.run()
 

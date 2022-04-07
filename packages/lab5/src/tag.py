@@ -13,7 +13,7 @@ class Tag():
     
 
     def add_tag(self,id,x,y,z,theta_x,theta_y,theta_z):
-        self.locations[id]=self.TranslationVector(x,y,z)
+        self.locations[id]=self.FeetToMetersTrsanslationVector(x,y,z)
         self.orientations[id]=self.eulerAnglesToRotationMatrix(theta_x,theta_y,theta_z)
 
         
@@ -41,5 +41,11 @@ class Tag():
     def TranslationVector(self,x,y,z):
         return np.array([[x],[y],[z]])
 
+    def FeetToMetersTrsanslationVector(self, x, y, z):
+        return np.array([[x], [y], [z]])*0.3048
+
     def estimate_pose(self, tag_id, R, t):
-        raise NotImplementedError
+        local = R.T @ t
+        trial = np.linalg.inv(R) @ (-t)
+        #return self.orientations[tag_id] @ local + self.locations[tag_id]
+        return R.T @ -t

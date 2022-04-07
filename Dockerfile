@@ -1,5 +1,5 @@
 # parameters
-ARG REPO_NAME="CMPUT412-Lab4-OpenCV"
+ARG REPO_NAME="CMPUT412-Lab5-Localization"
 ARG DESCRIPTION="PLease work :("
 ARG MAINTAINER="Alexander Laevens (alaevens@ualberta.ca)"
 # pick an icon from: https://fontawesome.com/v4.7.0/icons/
