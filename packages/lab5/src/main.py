@@ -14,8 +14,14 @@ from duckietown.dtros import DTROS, NodeType
 from sensor_msgs.msg import Range, CompressedImage, Image
 import cv2
 import cv_bridge
+import math
 
 bridge = cv_bridge.CvBridge()
+
+
+
+
+
 class MyNode(DTROS):
 
     def __init__(self, node_name):
@@ -34,10 +40,10 @@ class MyNode(DTROS):
         # Add information about tag locations
         # Function Arguments are id, x, y, z, theta_x, theta_y, theta_z (euler) 
         # for example, self.tags.add_tag( ... 
-        self.tags.add_tag(0, 0, 0, 1, 0, 0, 0)
-        self.tags.add_tag(1, 1, 0, 2, 0, (-math.pi)/2, 0)
-        self.tags.add_tag(2, 2, 0, 1, 0, -math.pi, 0)
-        self.tags.add_tag(3, 1, 0, 0, 0, (-3*math.pi)/2, 0)
+        self.tags.add_tag(0, 0, -0.354, 1, 0, -(3*math.pi)/2, 0)
+        self.tags.add_tag(1, 1, -0.354, 2, 0, 0, 0)
+        self.tags.add_tag(2, 2, -0.354, 1, 0, -math.pi/2, 0)
+        self.tags.add_tag(3, 1, -0.354, 0, 0, -math.pi, 0)
 
         # Load camera parameters
         with open("/data/config/calibrations/camera_intrinsic/csc22905.yaml") as file:
@@ -119,14 +125,22 @@ class MyNode(DTROS):
                 self.undistorted_pub.publish(msg)
                 tags_found = self.detect(undistorted)
                 
+                avg_pose = np.array([[0.0], [0.0], [0.0]])
+                avg_rot = np.array([0.0, 0.0, 0.0])
                 for tag in tags_found:
-                    print(tag.tag_id)
-                    print(tag.pose_t)
-                    #print(self.tags.estimate_pose(tag.tag_id, tag.pose_R, tag.pose_t))
+                    pose_estimate = self.tags.estimate_pose(tag.tag_id, tag.pose_R, tag.pose_t)
+                    avg_pose += pose_estimate
+                    rot_estimate = self.tags.estimate_euler_angles(tag.tag_id, tag.pose_R, tag.pose_t)
+                    avg_rot += rot_estimate
+
+                if len(tags_found) > 0:
+                    avg_pose /= len(tags_found)
+                    avg_rot /= len(tags_found)
+                    print(f"AVERAGE POSE: (X: {avg_pose[0, 0]}, Y:{avg_pose[1, 0]}, Z:{avg_pose[2, 0]})")
+                    print(f"AVERAGE Theta Y: {avg_rot[1]}")
                              
 
             rate.sleep()
-# https://prod.liveshare.vsengsaas.visualstudio.com/join?F71B98363431245A898C6375774D9D1C53A4
 
 if __name__ == "__main__":
     node = MyNode(node_name="lab5_node")

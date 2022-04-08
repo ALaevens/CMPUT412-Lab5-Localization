@@ -1,8 +1,25 @@
 import numpy as np
-
+import math
 '''
 Adapted from: https://raceon.io/localization/
 '''
+
+def rotation_matrix_euler_angles(R: np.array) -> np.array:
+    # Source: https://learnopencv.com/rotation-matrix-to-euler-angles/
+    sy = math.sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
+
+    singular = sy < 1e-6
+
+    if  not singular :
+        x = math.atan2(R[2,1] , R[2,2])
+        y = math.atan2(-R[2,0], sy)
+        z = math.atan2(R[1,0], R[0,0])
+    else :
+        x = math.atan2(-R[1,2], R[1,1])
+        y = math.atan2(-R[2,0], sy)
+        z = 0
+
+    return np.array([x, y, z])
 
 class Tag():
     def __init__(self, tag_size, family):
@@ -10,11 +27,15 @@ class Tag():
         self.size = tag_size
         self.locations = {}
         self.orientations = {}
+        self.orientations_euler = {}
+        self.correction = -np.eye(3)
+        self.correction[0, 0] = 1
     
 
     def add_tag(self,id,x,y,z,theta_x,theta_y,theta_z):
         self.locations[id]=self.FeetToMetersTrsanslationVector(x,y,z)
         self.orientations[id]=self.eulerAnglesToRotationMatrix(theta_x,theta_y,theta_z)
+        self.orientations_euler[id]=np.array([theta_x, theta_y, theta_z])
 
         
     # Calculates Rotation Matrix given euler angles.
@@ -37,6 +58,7 @@ class Tag():
         R = np.matmul(R_z, np.matmul(R_y, R_x))
 
         return R.T
+    
 
     def TranslationVector(self,x,y,z):
         return np.array([[x],[y],[z]])
@@ -45,7 +67,8 @@ class Tag():
         return np.array([[x], [y], [z]])*0.3048
 
     def estimate_pose(self, tag_id, R, t):
-        local = R.T @ t
-        trial = np.linalg.inv(R) @ (-t)
-        #return self.orientations[tag_id] @ local + self.locations[tag_id]
-        return R.T @ -t
+        return (self.orientations[tag_id] @ (R.T @ -t)) + self.locations[tag_id]
+    
+    def estimate_euler_angles(self, tag_id, R, t):
+        return (rotation_matrix_euler_angles(R.T) + self.orientations_euler[tag_id])/ np.pi * 180
+
