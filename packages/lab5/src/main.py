@@ -15,6 +15,7 @@ from sensor_msgs.msg import Range, CompressedImage, Image
 import cv2
 import cv_bridge
 import math
+from std_msgs.msg import String
 
 bridge = cv_bridge.CvBridge()
 
@@ -32,6 +33,7 @@ class MyNode(DTROS):
         self.img_sub = rospy.Subscriber('/csc22905/camera_node/image/compressed', CompressedImage, self.image_callback)
         self.range_sub = rospy.Subscriber("/csc22905/front_center_tof_driver_node/range", Range, self.range_callback)
         self.undistorted_pub = rospy.Publisher("/csc22905/lab5/undistorted/compressed", CompressedImage, queue_size=1)
+        self.location_pub = rospy.Publisher("/csc22905/lab5/location_string", String, queue_size=1)
 
         TAG_SIZE = .08
         FAMILIES = "tagStandard41h12"
@@ -40,10 +42,10 @@ class MyNode(DTROS):
         # Add information about tag locations
         # Function Arguments are id, x, y, z, theta_x, theta_y, theta_z (euler) 
         # for example, self.tags.add_tag( ... 
-        self.tags.add_tag(0, 0, -0.354, 1, 0, -(3*math.pi)/2, 0)
-        self.tags.add_tag(1, 1, -0.354, 2, 0, 0, 0)
-        self.tags.add_tag(2, 2, -0.354, 1, 0, -math.pi/2, 0)
-        self.tags.add_tag(3, 1, -0.354, 0, 0, -math.pi, 0)
+        self.tags.add_tag(0, 0, 0, 1, 0, -(3*math.pi)/2, 0)
+        self.tags.add_tag(1, 1, 0, 2, 0, 0, 0)
+        self.tags.add_tag(2, 2, 0, 1, 0, -math.pi/2, 0)
+        self.tags.add_tag(3, 1, 0, 0, 0, -math.pi, 0)
 
         # Load camera parameters
         with open("/data/config/calibrations/camera_intrinsic/csc22905.yaml") as file:
@@ -131,11 +133,13 @@ class MyNode(DTROS):
                     pose_estimate = self.tags.estimate_pose(tag.tag_id, tag.pose_R, tag.pose_t)
                     avg_pose += pose_estimate
                     rot_estimate = self.tags.estimate_euler_angles(tag.tag_id, tag.pose_R, tag.pose_t)
+                    #print(rot_estimate)
                     avg_rot += rot_estimate
 
                 if len(tags_found) > 0:
                     avg_pose /= len(tags_found)
-                    avg_rot /= len(tags_found)
+                    avg_rot /= -1*len(tags_found)
+                    self.location_pub.publish(f"{avg_pose[0,0]} {avg_pose[2, 0]}")
                     print(f"AVERAGE POSE: (X: {avg_pose[0, 0]}, Y:{avg_pose[1, 0]}, Z:{avg_pose[2, 0]})")
                     print(f"AVERAGE Theta Y: {avg_rot[1]}")
                              

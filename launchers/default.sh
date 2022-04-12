@@ -14,7 +14,7 @@ dt-launchfile-init
 
 # launching app
 #roscore &
-sleep 5
+#sleep 5
 dt-exec rosrun lab5 main.py
 
 

@@ -70,5 +70,14 @@ class Tag():
         return (self.orientations[tag_id] @ (R.T @ -t)) + self.locations[tag_id]
     
     def estimate_euler_angles(self, tag_id, R, t):
-        return (rotation_matrix_euler_angles(R.T) + self.orientations_euler[tag_id])/ np.pi * 180
+        rot = (rotation_matrix_euler_angles(R) + self.orientations_euler[tag_id])/ np.pi * 180
+
+        if rot[1] >= 0 and rot[1] <= 360:
+            return rot - 360
+        elif rot[1] < 0 and rot[1] >= -360:
+            return rot
+        else:
+            print("ROTATION ERROR")
+            return np.array([0.0, 0.0, 0.0])
+        #return rotation_matrix_euler_angles(self.orientations[tag_id] @ R.T)
 
